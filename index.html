@@ -37,9 +37,13 @@
             <textarea id="new-post-text" placeholder="Введите текст поста (поддерживается HTML)"></textarea>
             <div class="hint">Поддерживаются теги: &lt;b&gt;, &lt;i&gt;, &lt;u&gt;, &lt;a href="..."&gt;, &lt;br&gt;</div>
             
-            <label style="display:block; margin-top:15px; font-weight:bold;">Прикрепить фото или видео:</label>
-            <input type="file" id="new-post-file" accept="image/*,video/*">
-            <button class="btn-danger" onclick="clearNewFile()">Убрать выбранный файл</button>
+            <label style="display:block; margin-top:15px; font-weight:bold;">Прикрепить фото (до 12 штук):</label>
+            <input type="file" id="new-post-images" accept="image/*" multiple>
+            <button class="btn-danger" onclick="clearNewImages()">Убрать выбранные фото</button>
+            
+            <label style="display:block; margin-top:15px; font-weight:bold;">Прикрепить видео (только одно):</label>
+            <input type="file" id="new-post-video" accept="video/*">
+            <button class="btn-danger" onclick="clearNewVideo()">Убрать выбранное видео</button>
             
             <button class="btn-primary" onclick="publishPost()">Опубликовать</button>
             <button class="btn-secondary" onclick="backToMenu()">Назад</button>
@@ -78,8 +82,12 @@
             document.getElementById('main-menu').classList.remove('hidden');
         }
 
-        function clearNewFile() {
-            document.getElementById('new-post-file').value = '';
+        function clearNewImages() {
+            document.getElementById('new-post-images').value = '';
+        }
+
+        function clearNewVideo() {
+            document.getElementById('new-post-video').value = '';
         }
 
         function publishPost() {
