@@ -4,19 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Progressive Bot UI</title>
-    <!-- Подключаем MAX Bridge -->
     <script src="https://st.max.ru/js/max-web-app.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; text-align: center; }
+        h2 { font-size: 18px; margin-top: 20px; }
         button { width: 100%; padding: 15px; margin-top: 10px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
         .btn-primary { background-color: #007aff; color: white; }
         .btn-secondary { background-color: #e5e5ea; color: #000; }
+        .btn-danger { background-color: #ff3b30; color: white; font-size: 14px; padding: 8px; margin-top: 5px; }
         .hidden { display: none; }
         textarea { width: 100%; height: 150px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; margin-top: 10px; }
+        input[type="text"] { width: 100%; padding: 10px; margin-top: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; }
         input[type="file"] { margin-top: 10px; }
-        .form-group { margin-top: 20px; }
+        .hint { font-size: 12px; color: #666; margin-top: 5px; }
     </style>
 </head>
 <body>
@@ -33,7 +35,12 @@
         <div id="new-post-form" class="hidden">
             <h2>Новый пост</h2>
             <textarea id="new-post-text" placeholder="Введите текст поста (поддерживается HTML)"></textarea>
+            <div class="hint">Поддерживаются теги: &lt;b&gt;, &lt;i&gt;, &lt;u&gt;, &lt;a href="..."&gt;, &lt;br&gt;</div>
+            
+            <label style="display:block; margin-top:15px; font-weight:bold;">Прикрепить фото или видео:</label>
             <input type="file" id="new-post-file" accept="image/*,video/*">
+            <button class="btn-danger" onclick="clearNewFile()">Убрать выбранный файл</button>
+            
             <button class="btn-primary" onclick="publishPost()">Опубликовать</button>
             <button class="btn-secondary" onclick="backToMenu()">Назад</button>
         </div>
@@ -41,15 +48,16 @@
         <!-- Форма редактирования -->
         <div id="edit-post-form" class="hidden">
             <h2>Редактировать пост</h2>
-            <input type="text" id="edit-post-id" placeholder="ID поста (например, mid.xxxxxx)" style="width:100%; padding:10px; margin-top:10px; box-sizing:border-box;">
+            <input type="text" id="edit-post-id" placeholder="ID поста (например, mid.xxxxxx)">
             <textarea id="edit-post-text" placeholder="Новый текст поста"></textarea>
+            <div class="hint">Вложения (фото, видео) при редактировании текста не затрагиваются.</div>
+            
             <button class="btn-primary" onclick="updatePost()">Обновить</button>
             <button class="btn-secondary" onclick="backToMenu()">Назад</button>
         </div>
     </div>
 
     <script>
-        // Инициализация MAX Bridge
         if (window.WebApp) {
             window.WebApp.ready();
         }
@@ -70,7 +78,10 @@
             document.getElementById('main-menu').classList.remove('hidden');
         }
 
-        // Пока это заглушки. Логику добавим на следующем этапе.
+        function clearNewFile() {
+            document.getElementById('new-post-file').value = '';
+        }
+
         function publishPost() {
             alert('Кнопка "Опубликовать" нажата! Скоро здесь будет логика.');
         }
