@@ -23,7 +23,10 @@
         .file-item { display: flex; align-items: center; padding: 8px; border: 1px solid #ddd; border-radius: 8px; margin-top: 5px; background: #fafafa; }
         .file-item img { width: 50px; height: 50px; object-fit: cover; border-radius: 4px; margin-right: 10px; }
         .file-item .file-name { flex: 1; font-size: 14px; word-break: break-all; }
-        .file-item .remove-btn { background: none; border: none; color: #ff3b30; font-size: 20px; cursor: pointer; padding: 0 5px; width: auto; margin: 0; }
+        .file-item .remove-btn { background: none; border: none; color: #db695d; font-size: 20px; cursor: pointer; padding: 0 5px; width: auto; margin: 0; }
+        .status { margin-top: 15px; padding: 10px; border-radius: 8px; font-size: 14px; text-align: center; display: none; }
+        .status.success { background: #d4edda; color: #155724; display: block; }
+        .status.error { background: #f8d7da; color: #721c24; display: block; }
     </style>
 </head>
 <body>
@@ -53,6 +56,7 @@
             
             <button class="btn-primary" onclick="publishPost()">Опубликовать</button>
             <button class="btn-secondary" onclick="backToMenu()">Назад</button>
+            <div id="new-post-status" class="status"></div>
         </div>
 
         <!-- Форма редактирования -->
@@ -64,6 +68,7 @@
             
             <button class="btn-primary" onclick="updatePost()">Обновить</button>
             <button class="btn-secondary" onclick="backToMenu()">Назад</button>
+            <div id="edit-post-status" class="status"></div>
         </div>
     </div>
 
@@ -72,7 +77,9 @@
             window.WebApp.ready();
         }
 
-        // Массив выбранных фото
+        // !!! ВАЖНО: Сюда мы вставим адрес твоего бота, когда настроим туннель !!!
+        const BOT_API_URL = "http://localhost:8080"; 
+
         let selectedImages = [];
 
         function showNewPost() {
@@ -91,43 +98,31 @@
             document.getElementById('main-menu').classList.remove('hidden');
         }
 
-        // Обработка выбора фото
         document.getElementById('new-post-images').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
-            files.forEach(file => {
-                selectedImages.push(file);
-            });
+            files.forEach(file => selectedImages.push(file));
             renderImageList();
-            // Сбрасываем input, чтобы можно было выбрать те же файлы снова
             this.value = '';
         });
 
-        // Отрисовка списка фото с миниатюрами и крестиками
         function renderImageList() {
             const list = document.getElementById('image-list');
             list.innerHTML = '';
             selectedImages.forEach((file, index) => {
                 const item = document.createElement('div');
                 item.className = 'file-item';
-                
                 const img = document.createElement('img');
                 img.src = URL.createObjectURL(file);
                 item.appendChild(img);
-                
                 const name = document.createElement('span');
                 name.className = 'file-name';
                 name.textContent = file.name;
                 item.appendChild(name);
-                
                 const removeBtn = document.createElement('button');
                 removeBtn.className = 'remove-btn';
                 removeBtn.textContent = '×';
-                removeBtn.onclick = () => {
-                    selectedImages.splice(index, 1);
-                    renderImageList();
-                };
+                removeBtn.onclick = () => { selectedImages.splice(index, 1); renderImageList(); };
                 item.appendChild(removeBtn);
-                
                 list.appendChild(item);
             });
         }
@@ -142,12 +137,70 @@
             document.getElementById('new-post-video').value = '';
         }
 
-        function publishPost() {
-            alert('Кнопка "Опубликовать" нажата! Скоро здесь будет логика.');
+        // Отправка нового поста на сервер (твой бот)
+        async function publishPost() {
+            const text = document.getElementById('new-post-text').value;
+            const videoFile = document.getElementById('new-post-video').files[0];
+            const statusDiv = document.getElementById('new-post-status');
+            
+            statusDiv.className = 'status';
+            statusDiv.textContent = 'Отправка...';
+
+            const formData = new FormData();
+            formData.append('text', text);
+            
+            if (videoFile) formData.append('video', videoFile);
+            selectedImages.forEach(img => formData.append('images', img));
+
+            try {
+                // Отправляем данные на твой бот
+                const response = await fetch(`${BOT_API_URL}/publish`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = `✅ Пост опубликован! ID: ${result.message_id || 'получен'}`;
+                } else {
+                    throw new Error(result.error || 'Ошибка сервера');
+                }
+            } catch (err) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `❌ Ошибка: ${err.message}`;
+            }
         }
 
-        function updatePost() {
-            alert('Кнопка "Обновить" нажата! Скоро здесь будет логика.');
+        // Отправка изменений
+        async function updatePost() {
+            const messageId = document.getElementById('edit-post-id').value;
+            const text = document.getElementById('edit-post-text').value;
+            const statusDiv = document.getElementById('edit-post-status');
+            
+            statusDiv.className = 'status';
+            statusDiv.textContent = 'Обновление...';
+
+            try {
+                const response = await fetch(`${BOT_API_URL}/edit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message_id: messageId, text: text })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = '✅ Пост обновлён!';
+                } else {
+                    throw new Error(result.error || 'Ошибка сервера');
+                }
+            } catch (err) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `❌ Ошибка: ${err.message}`;
+            }
         }
     </script>
 </body>
