@@ -4,16 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Progressive Bot UI</title>
+    <!-- 
+      MAX Bridge: официальная библиотека для взаимодействия мини-приложения с MAX.
+      Подключается через CDN. Даёт доступ к window.WebApp (данные пользователя, платформа и т.д.).
+      Источник: https://st.max.ru/js/max-web-app.js
+    -->
     <script src="https://st.max.ru/js/max-web-app.js"></script>
     <style>
+        /* 
+          Цветовая схема: 
+          - Основной цвет (btn-primary) — приглушённый синий #5b9bd5 (вместо яркого #007aff).
+            Причина: яркий синий «вырви глаз», приглушённый комфортнее для длительной работы.
+          - Опасные кнопки (btn-danger) — терракотовый #db695d (вместо яркого #ff3b30).
+            Причина: та же — снижение визуального напряжения.
+        */
         body { font-family: sans-serif; padding: 20px; background-color: #f4f4f9; }
         .container { max-width: 600px; margin: 0 auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         h1 { font-size: 20px; text-align: center; }
         h2 { font-size: 18px; margin-top: 20px; }
         button { width: 100%; padding: 15px; margin-top: 10px; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-        .btn-primary { background-color: #007aff; color: white; }
+        .btn-primary { background-color: #5b9bd5; color: white; } /* приглушённый синий */
         .btn-secondary { background-color: #e5e5ea; color: #000; }
-        .btn-danger { background-color: #db695d; color: white; font-size: 14px; padding: 8px; margin-top: 5px; }
+        .btn-danger { background-color: #db695d; color: white; font-size: 14px; padding: 8px; margin-top: 5px; } /* терракотовый */
         .hidden { display: none; }
         textarea { width: 100%; height: 150px; padding: 10px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; margin-top: 10px; }
         input[type="text"] { width: 100%; padding: 10px; margin-top: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; }
@@ -30,7 +42,7 @@
         .status .copy-btn { background: none; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; width: auto; margin: 0 0 0 10px; }
         .channel-switch { display: flex; gap: 10px; margin-top: 15px; }
         .channel-switch button { flex: 1; padding: 10px; font-size: 14px; }
-        .channel-switch button.active { background-color: #007aff; color: white; }
+        .channel-switch button.active { background-color: #5b9bd5; color: white; }
         .channel-switch button.inactive { background-color: #e5e5ea; color: #000; }
     </style>
 </head>
@@ -74,6 +86,19 @@
         <!-- Форма редактирования -->
         <div id="edit-post-form" class="hidden">
             <h2>Редактировать пост</h2>
+            
+            <!-- 
+              Переключатель каналов для редактирования.
+              Причина: message_id уникален только внутри канала.
+              Один и тот же ID может существовать в разных каналах.
+              Поэтому перед редактированием нужно указать, в каком канале искать пост.
+            -->
+            <label style="display:block; margin-top:10px; font-weight:bold;">В каком канале искать пост:</label>
+            <div class="channel-switch">
+                <button id="edit-btn-test" class="active" onclick="selectEditChannel('test')">Тестовый канал</button>
+                <button id="edit-btn-main" class="inactive" onclick="selectEditChannel('main')">Основной канал</button>
+            </div>
+            
             <input type="text" id="edit-post-id" placeholder="ID поста (например, mid.xxxxxx)">
             <textarea id="edit-post-text" placeholder="Новый текст поста"></textarea>
             <div class="hint">Вложения (фото, видео) при редактировании текста не затрагиваются.</div>
@@ -85,19 +110,47 @@
     </div>
 
     <script>
+        // Инициализация MAX Bridge. ready() сообщает MAX, что приложение готово к работе.
         if (window.WebApp) {
             window.WebApp.ready();
         }
 
+        // 
+        // АДРЕС БОТА (туннель Cloudflare).
+        // ВАЖНО: ссылка временная. После перезапуска cloudflared она меняется.
+        // Если форма перестала работать — проверь, что ссылка актуальна.
+        // 
         const BOT_API_URL = "https://watershed-difficulty-national-prince.trycloudflare.com";
 
+        // Массив выбранных фото (для предпросмотра и удаления по одному)
         let selectedImages = [];
-        let selectedChannel = "test"; // по умолчанию тестовый
 
+        // Текущий выбранный канал для публикации ("test" или "main")
+        let selectedChannel = "test";
+
+        // Текущий выбранный канал для редактирования ("test" или "main")
+        let selectedEditChannel = "test";
+
+        // 
+        // Переключатель канала для ПУБЛИКАЦИИ.
+        // Причина: нужно уметь постить в тестовый канал для проверки,
+        // а потом — в основной. ID каналов передаются боту в поле "channel".
+        // 
         function selectChannel(channel) {
             selectedChannel = channel;
             document.getElementById('btn-test').className = (channel === 'test') ? 'active' : 'inactive';
             document.getElementById('btn-main').className = (channel === 'main') ? 'active' : 'inactive';
+        }
+
+        // 
+        // Переключатель канала для РЕДАКТИРОВАНИЯ.
+        // Причина: message_id уникален только внутри канала, поэтому
+        // при редактировании нужно явно указывать, в каком канале искать пост.
+        // 
+        function selectEditChannel(channel) {
+            selectedEditChannel = channel;
+            document.getElementById('edit-btn-test').className = (channel === 'test') ? 'active' : 'inactive';
+            document.getElementById('edit-btn-main').className = (channel === 'main') ? 'active' : 'inactive';
         }
 
         function showNewPost() {
@@ -116,13 +169,15 @@
             document.getElementById('main-menu').classList.remove('hidden');
         }
 
+        // Обработка выбора фото: добавляем в массив и перерисовываем список
         document.getElementById('new-post-images').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             files.forEach(file => selectedImages.push(file));
             renderImageList();
-            this.value = '';
+            this.value = ''; // сбрасываем input, чтобы можно было выбрать те же файлы снова
         });
 
+        // Отрисовка списка фото с миниатюрами и крестиками для удаления по одному
         function renderImageList() {
             const list = document.getElementById('image-list');
             list.innerHTML = '';
@@ -155,6 +210,11 @@
             document.getElementById('new-post-video').value = '';
         }
 
+        // 
+        // Показ статуса (успех/ошибка) с кнопкой «Копировать».
+        // Кнопка копирует текст статуса в буфер обмена БЕЗ alert-оповещения.
+        // Причина: alert раздражает, а факт копирования и так понятен.
+        // 
         function showStatus(elementId, isSuccess, text) {
             const statusDiv = document.getElementById(elementId);
             statusDiv.className = isSuccess ? 'status success' : 'status error';
@@ -164,14 +224,18 @@
             `;
         }
 
+        // Копирование текста статуса в буфер обмена без оповещения
         function copyStatus(elementId) {
             const statusDiv = document.getElementById(elementId);
             const text = statusDiv.querySelector('span').textContent;
-            navigator.clipboard.writeText(text).then(() => {
-                alert('Текст скопирован в буфер обмена!');
-            });
+            navigator.clipboard.writeText(text);
         }
 
+        // 
+        // Публикация нового поста.
+        // Отправляет на бот: text, channel, images[], video.
+        // Бот, в свою очередь, публикует в выбранный канал.
+        // 
         async function publishPost() {
             const text = document.getElementById('new-post-text').value;
             const videoFile = document.getElementById('new-post-video').files[0];
@@ -203,6 +267,11 @@
             }
         }
 
+        // 
+        // Редактирование поста.
+        // Отправляет на бот: message_id, text, channel.
+        // Бот использует channel, чтобы понять, в каком канале искать пост.
+        // 
         async function updatePost() {
             const messageId = document.getElementById('edit-post-id').value;
             const text = document.getElementById('edit-post-text').value;
@@ -213,7 +282,11 @@
                 const response = await fetch(`${BOT_API_URL}/edit`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message_id: messageId, text: text })
+                    body: JSON.stringify({ 
+                        message_id: messageId, 
+                        text: text,
+                        channel: selectedEditChannel
+                    })
                 });
                 
                 const result = await response.json();
